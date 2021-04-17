@@ -16,6 +16,8 @@ dependencies:
 - base >= 4.7 && < 5
 - containers
 - megaparsec
+- mtl
+- transformers
 - text
 
 library:
@@ -33,23 +35,6 @@ executables:
     - Ex2-Adder
 
 tests:
-  Ex2-Adder-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - Ex2-Adder
-
-  Ex2-Adder-test:
-    main:                ParserSpec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - Ex2-Adder
-    - hspec
+  spec:
+    defaults: hspec/hspec@master
+    dependencies: Ex2-Adder

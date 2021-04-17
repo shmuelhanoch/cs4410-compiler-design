@@ -1,10 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import Compile
 
 import qualified Data.Text.IO as T
+import System.IO (stderr)
 
 main :: IO ()
-main = either T.putStrLn T.putStrLn $ compile ""
+main = T.getContents >>= either (T.hPutStrLn stderr) T.putStrLn . compile

@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
 module Parser
-  ( Parser,
-    parseExpr,
+  ( ExprA,
+    Parser,
+    parseExpr
   )
 where
 
@@ -16,6 +17,8 @@ import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+
+type ExprA = Expr SourcePos
 
 type Parser = Parsec Void Text
 
@@ -36,65 +39,70 @@ lexeme_ = L.lexeme sc_
 integer_ :: Parser Integer
 integer_ = lexeme_ L.decimal
 
-enumber_ :: Parser ExprA
-enumber_ = do
-  pos <- posToSrcLoc <$> getSourcePos
-  ENumber pos . fromIntegral <$> integer_
+eNumber_ :: Parser ExprA
+eNumber_ = do
+  p <- pos
+  lexeme_ $ ENumber p . fromIntegral <$> integer_
 
+eIden_ :: Parser ExprA
+eIden_ = EIden <$> pos <*> identifier_
 
 expr_ :: Parser ExprA
-expr_ = enumber_ <|> eprim_ <|> elet_
+expr_ = choice
+  [ try ePrim_
+  , elet_
+  , eNumber_
+  , eIden_
+  ]
 
-eprim_ :: Parser ExprA
-eprim_ = do
-  pos <- posToSrcLoc <$> getSourcePos
+ePrim_ :: Parser ExprA
+ePrim_ = do
+  p <- pos
+  void lparen_
   prim <- prim_
-  EPrim1 pos prim <$> expr_
+  expr <- expr_
+  void rparen_
+  lexeme_ $ pure $ EPrim1 p prim expr
 
 prim_ :: Parser Prim1
-prim_ = add_ <|> sub_
+prim_ = add1_ <|> sub1_
 
 elet_ :: Parser ExprA
 elet_ = do
-  pos <- posToSrcLoc <$> getSourcePos
+  p <- pos
   void lparen_
-  bindList <- some letbind_
+  let_
+  void lparen_
+  binds <- some bind
   void rparen_
-  ELet pos bindList <$> expr_
+  inExpr <- expr_
+  void rparen_
+  lexeme_ $ pure $ ELet p binds inExpr
+    where
+      bind = do
+        void lparen_
+        var <- identifier_
+        e <- expr_
+        void rparen_
+        pure (var, e)
 
-letbind_ :: Parser (Text, ExprA)
-letbind_ = do
-  void lparen_
-  name <- string
-  void space1
-  expr <- expr_
-  pure $ (name, expr)
+identifier_ :: Parser Text
+identifier_ = lexeme_ $ T.pack <$> some alphaNumChar
 
-add_ :: Parser Prim1
-add_ = undefined
+let_ :: Parser ()
+let_ = void $ lexeme_ $ string "let"
 
-sub_ :: Parser Prim1
-sub_ = undefined
+add1_ :: Parser Prim1
+add1_ = lexeme_ $ PAdd1 <$ string "add1"
+
+sub1_ :: Parser Prim1
+sub1_ = lexeme_ $ PSub1 <$ string "sub1"
 
 lparen_ :: Parser Char
-lparen_ = char "("
+lparen_ = lexeme_ $ char '('
 
 rparen_ :: Parser Char
-rparen_ = char ")"
+rparen_ = lexeme_ $ char ')'
 
-{-
-data Prim1
- = PAdd1
- | PSub1
-
-data Expr ann
-  = ENumber ann Int
-  | EPrim1 ann Prim1 (Expr ann)
-  | ELet ann [(Text, Expr ann)] (Expr ann)
--}
-
-posToSrcLoc :: SourcePos -> SrcLoc
-posToSrcLoc (SourcePos file linePos colPos) = SrcLoc
-  (T.pack file)
-  (unPos linePos)
-  (unPos colPos)
+pos :: Parser SourcePos
+pos = getSourcePos

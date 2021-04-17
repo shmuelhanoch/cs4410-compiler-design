@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "Ex2-Adder:lib"
+
+    - path: "./app/Main.hs"
+      component: "Ex2-Adder:exe:Ex2-Adder-exe"
+
+    - path: "./app/Paths_Ex2_Adder.hs"
+      component: "Ex2-Adder:exe:Ex2-Adder-exe"
+
+    - path: "./test"
+      component: "Ex2-Adder:test:spec"
