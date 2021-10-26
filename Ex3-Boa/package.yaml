@@ -1,0 +1,48 @@
+name:                Ex3-Boa
+version:             0.1.0.0
+github:              "shmuelhanoch/Ex3-Boa"
+license:             BSD3
+author:              "Shmuel Hanoch"
+maintainer:          "shmuelhanoch@gmail.com"
+copyright:           "2021 Shmuel Hanoch"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+description:         Please see the README on GitHub at <https://github.com/shmuelhanoch/Ex2-Adder#readme>
+
+dependencies:
+- base
+- containers
+- fixplate
+- lens
+- megaparsec
+- mtl
+- optparse-applicative
+- prettyprinter >= 1.7.0
+- prettyprinter-ansi-terminal >=1.1.2
+- parser-combinators
+- text
+- transformers
+
+library:
+  source-dirs: src
+
+executables:
+  Ex3-Boa-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - Ex3-Boa
+
+tests:
+  spec:
+    defaults: hspec/hspec@master
+    dependencies: Ex3-Boa
+
+ghc-options: -Wall

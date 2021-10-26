@@ -1,22 +1,24 @@
+
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module ExprToAsm (compileExpr, compileProg) where
+module Language.Boa.ExprToAsm (compileExpr, compileProg) where
 
-import Asm
-import PPAsm (asmToStr)
-import Syntax
-
-import Control.Monad.Except
-import Control.Monad.State
-import Data.Traversable (for)
+import Control.Monad.Except (MonadError (throwError))
+import Control.Monad.State (MonadState, State, evalState, get, put)
+import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Traversable (for)
 import Text.Printf (printf)
+import Data.Generics.Fixplate (Attr, Mu (Fix), Ann (Ann))
 
+import Language.Boa.Asm
+import Language.Boa.PPAsm
+import Language.Boa.Syntax (ExprF (..), Prim1 (Add1, Sub1), Prim2 (Add, Sub, Times))
 
 type Env = Map Text Offset
 
@@ -36,9 +38,6 @@ prelude =  T.intercalate "\n"
 suffix :: Text
 suffix = "ret"
 
-emptyEnv :: Env
-emptyEnv = M.empty
-
 addVar :: Text -> Env -> (Env, Offset)
 addVar var env =
   let off = M.size env + 1
@@ -47,23 +46,24 @@ addVar var env =
 lookupVar :: Text -> Env -> Maybe Offset
 lookupVar = M.lookup
 
-compileExpr :: Expr a -> Either Text Text
+compileExpr :: Attr ExprF () -> Either Text Text
 compileExpr = fmap asmToStr . runCodeGenM mempty . doCompileExpr
 
-doCompileExpr :: Expr a -> CodeGenM [Instruction]
+doCompileExpr :: Attr ExprF () -> CodeGenM [Instruction]
 doCompileExpr = \case
-  ENumber _ n -> pure [IMov (AReg RAX) (ALit n)]
-  EIden _ var -> do
+  Fix (Ann _ (ENumber n)) -> pure [IMov (AReg RAX) (ALit n)]
+  Fix (Ann _ (EId var)) -> do
     env <- get
     case lookupVar var env of
       Just off -> pure
         [IMov (AReg RAX) (ARegOffset RSP (-off))]
       Nothing -> throwError $ "Variable not in scope: " <> var
-  EPrim1 _ PAdd1 e ->
+  Fix (Ann _ (EPrim1 Add1 e)) ->
     (<> [IAdd (AReg RAX) (ALit 1)]) <$> doCompileExpr e
-  EPrim1 _ PSub1 e ->
+  Fix (Ann _ (EPrim1 Sub1 e)) ->
     (<> [IAdd (AReg RAX) (ALit (-1))]) <$> doCompileExpr e
-  ELet _ binds inExpr -> do
+  Fix (Ann _ (EPrim2 op e1 e2)) -> compileBinOp op e1 e2
+  Fix (Ann _ (ELet binds inExpr)) -> do
     bindsCode <- for binds $ \(var, e) -> do
       bindCode <- doCompileExpr e
       env <- get
@@ -72,9 +72,32 @@ doCompileExpr = \case
       pure $ bindCode <> [IMov (ARegOffset RSP (-off)) (AReg RAX)]
     inCode <- doCompileExpr inExpr
     pure $ concat bindsCode <> inCode
+  Fix (Ann _ (EIf _cond _thenE _elseE)) -> undefined
+
+compileBinOp :: Prim2 -> Attr ExprF () -> Attr ExprF () -> CodeGenM [Instruction]
+compileBinOp op e1 e2 = do
+  let op' = opToAsm op
+  e1' <- doCompileExpr e1
+  e2' <- case e2 of
+    Fix (Ann _ (ENumber n)) -> pure [op' (AReg RAX) (ALit n)]
+    Fix (Ann _ (EId var)) -> do
+      env <- get
+      case lookupVar var env of
+        Just off -> pure
+          [op' (AReg RAX) (ARegOffset RSP (-off))]
+        Nothing -> throwError $ "Variable not in scope: " <> var
+    _ -> throwError $ T.pack $ printf
+      "The expression is not in ANF: got %s as an argument to Sub."
+      (show e2)
+  pure $ e1' <> e2'
+  where
+    opToAsm = \case
+      Add -> IAdd
+      Sub -> ISub
+      Times -> IMul
 
 
-compileProg :: Expr a -> Either Text Text
+compileProg :: Attr ExprF () -> Either Text Text
 compileProg e = do
   body <- compileExpr e
   pure $ T.intercalate "\n"

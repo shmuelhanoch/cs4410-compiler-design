@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "Ex3-Boa:lib"
+
+    - path: "./app/Main.hs"
+      component: "Ex3-Boa:exe:Ex3-Boa-exe"
+
+    - path: "./app/Paths_Ex3_Boa.hs"
+      component: "Ex3-Boa:exe:Ex3-Boa-exe"
+
+    - path: "./test"
+      component: "Ex3-Boa:test:spec"

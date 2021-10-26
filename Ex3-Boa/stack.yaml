@@ -1,0 +1,8 @@
+resolver: lts-18.10
+
+packages:
+- .
+
+extra-deps:
+- fixplate-0.1.8@sha256:5497a9990ba21619454fabf326febdfc6fcbc4e7b41bfda2e71954be8f2bac53,3508
+
